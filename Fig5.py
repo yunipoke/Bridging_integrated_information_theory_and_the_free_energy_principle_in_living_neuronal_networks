@@ -9,7 +9,7 @@ from utils import formatted_ax, forest_plot, Z_score_2d, corr_color
 from multiprocessing import Pool
 
 ROOT = os.getcwd()
-EXP_GLOB = os.path.join(ROOT, "experiment_*")
+EXP_GLOB = os.path.join(ROOT, 'derivatives/experiment_*')
 output_path = os.path.join(ROOT, 'fig')
 
 n_sources = 2
@@ -25,27 +25,27 @@ Phi_R_mc_all = []
 Bayesian_surpise_contrast_all = []
 coreness_contrast_all = []
 for exp_id, exp_dir in enumerate(exp_dirs):
-    s1_preferring_electrodes = np.load(f'{exp_dir}/derivatives/s1_preferring_electrodes.npy')
-    s2_preferring_electrodes = np.load(f'{exp_dir}/derivatives/s2_preferring_electrodes.npy')
+    s1_preferring_electrodes = np.load(f'{exp_dir}/s1_preferring_electrodes.npy')
+    s2_preferring_electrodes = np.load(f'{exp_dir}/s2_preferring_electrodes.npy')
     n_s1prefs = len(s1_preferring_electrodes)
     n_prefs = len(s1_preferring_electrodes) + len(s2_preferring_electrodes)
-    VFE = np.load(f'{exp_dir}/derivatives/variational_free_energy.npy')
+    VFE = np.load(f'{exp_dir}/variational_free_energy.npy')
     VFE = np.sum(VFE, axis = (1, 2))
     VFE_all.append(VFE)
-    Bayesian_surprise = np.load(f'{exp_dir}/derivatives/Bayesian_surprise.npy')
+    Bayesian_surprise = np.load(f'{exp_dir}/Bayesian_surprise.npy')
     s1_Bayesian_surprise = np.sum(Bayesian_surprise[:, :, 0], axis = 1)
     s2_Bayesian_surprise = np.sum(Bayesian_surprise[:, :, 1], axis = 1)
     Bayesian_surpise_contrast = (s1_Bayesian_surprise - s2_Bayesian_surprise) / (s1_Bayesian_surprise + s2_Bayesian_surprise)
     Bayesian_surpise_contrast_all.append(Bayesian_surpise_contrast)
     Bayesian_surprise = np.sum(Bayesian_surprise, axis = (1, 2))
     Bayesian_surprise_all.append(Bayesian_surprise)
-    Accuracy = np.load(f'{exp_dir}/derivatives/accuracy.npy')
+    Accuracy = np.load(f'{exp_dir}/accuracy.npy')
     Accuracy = np.sum(Accuracy, axis = (1, 2))
     Accuracy_all.append(Accuracy)
-    Phi_R_mc = np.load(f'{exp_dir}/derivatives/Phi_R_mc.npy')
+    Phi_R_mc = np.load(f'{exp_dir}/Phi_R_mc.npy')
     Phi_R_mc /= n_prefs * (n_prefs - 1) / 2
     Phi_R_mc_all.append(Phi_R_mc)
-    coreness = np.load(f'{exp_dir}/derivatives/coreness.npy')
+    coreness = np.load(f'{exp_dir}/coreness.npy')
     coreness /= n_prefs * (n_prefs - 1) / 2
     s1_coreness = np.mean(coreness[:, :n_s1prefs], axis = 1)
     s2_coreness = np.mean(coreness[:, n_s1prefs:], axis = 1)

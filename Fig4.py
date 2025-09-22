@@ -9,7 +9,7 @@ from utils import formatted_ax, forest_plot, plot_session_transitions, iqr, mutu
 from multiprocessing import Pool
 
 ROOT = os.getcwd()
-EXP_GLOB = os.path.join(ROOT, "experiment_*")
+EXP_GLOB = os.path.join(ROOT, 'derivatives/experiment_*')
 output_path = os.path.join(ROOT, 'fig')
 
 n_sources = 2
@@ -26,24 +26,26 @@ mean_response_iqr_all = []
 response_iqr_inside_all = []
 response_iqr_outside_all = []
 for exp_id, exp_dir in enumerate(exp_dirs):
-    neuronal_responses = np.load(f'{exp_dir}/derivatives/neuronal_responses.npy')
-    s1_preferring_electrodes = np.load(f'{exp_dir}/derivatives/s1_preferring_electrodes.npy')
-    s2_preferring_electrodes = np.load(f'{exp_dir}/derivatives/s2_preferring_electrodes.npy')
-    source_states = np.load(f'{exp_dir}/derivatives/hidden_source_states.npy')
+    neuronal_responses = np.load(f'{exp_dir}/neuronal_responses.npy')
+    s1_preferring_electrodes = np.load(f'{exp_dir}/s1_preferring_electrodes.npy')
+    s2_preferring_electrodes = np.load(f'{exp_dir}/s2_preferring_electrodes.npy')
+    source_states = np.load(f'{exp_dir}/hidden_source_states.npy')
     source_states = source_states[:, 0] * 1 + source_states[:, 1] * 2
     n_channels = neuronal_responses.shape[2]
 
     preferring_electrodes = np.concatenate([s1_preferring_electrodes, s2_preferring_electrodes])
     n_prefs = len(preferring_electrodes)
     n_stims = (source_states != 0).sum()
+    n_obs = 290
     
-    if not os.path.exists(f'{exp_dir}/derivatives/pairwise_Phi_R'):
-        os.mkdir(f'{exp_dir}/derivatives/pairwise_Phi_R')
+    if not os.path.exists(f'{exp_dir}/pairwise_Phi_R'):
+        os.mkdir(f'{exp_dir}/pairwise_Phi_R')
 
     def calculate_pairwise_Phi_R(i_session):
-        spike_series = np.load(f'{exp_dir}/derivatives/pref_spike_series/session_{i_session + 1:03d}.npy')
+        spike_idx = np.load(f'{exp_dir}/pref_spike_series/session_{i_session + 1:03d}.npy')
+        spike_series = np.zeros((n_prefs, n_trials, n_obs), dtype = int)
+        np.add.at(spike_series, tuple(spike_idx.T), 1)
         spike_series = spike_series[:, source_states != 0, :]
-        n_obs = spike_series.shape[2]
         spike_cumsum = np.zeros((n_prefs, n_stims, n_obs + 1))
         spike_cumsum[:, :, 1:] = np.cumsum(spike_series, axis = 2)
 
@@ -84,7 +86,7 @@ for exp_id, exp_dir in enumerate(exp_dirs):
                 min_MI = min(part_MI_X, part_MI_Y, cross_MI_XY, cross_MI_YX)
                 Phi_R = whole_MI - part_MI_X - part_MI_Y + min_MI
                 Phi_R_matrix[i_pref, j_pref] = Phi_R_matrix[j_pref, i_pref] = Phi_R
-        np.save(f'{exp_dir}/derivatives/pairwise_Phi_R/session{i_session+1:03d}', Phi_R_matrix)
+        np.save(f'{exp_dir}/pairwise_Phi_R/session{i_session+1:03d}', Phi_R_matrix)
     
     n_workers = 34
     with Pool(n_workers) as p:
@@ -92,9 +94,9 @@ for exp_id, exp_dir in enumerate(exp_dirs):
     
     # For complex extraction, we utilized the original MATLAB source (https://github.com/JunKitazono/BidirectionallyConnectedCores.git)
     
-    Phi_R_mc = np.load(f'{exp_dir}/derivatives/Phi_R_mc.npy')
-    coreness = np.load(f'{exp_dir}/derivatives/coreness.npy')
-    inside_main_complex = np.load(f'{exp_dir}/derivatives/inside_main_complex.npy')
+    Phi_R_mc = np.load(f'{exp_dir}/Phi_R_mc.npy')
+    coreness = np.load(f'{exp_dir}/coreness.npy')
+    inside_main_complex = np.load(f'{exp_dir}/inside_main_complex.npy')
     Phi_R_mc /= n_prefs * (n_prefs - 1) / 2
     coreness /= n_prefs * (n_prefs - 1) / 2
     main_complex_size = np.sum(inside_main_complex, axis = 1)

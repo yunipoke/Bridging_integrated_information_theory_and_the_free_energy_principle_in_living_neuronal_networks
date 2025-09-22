@@ -6,7 +6,8 @@ import matplotlib.pyplot as plt
 from utils import formatted_ax
 
 ROOT = os.getcwd()
-EXP_GLOB = os.path.join(ROOT, 'experiment_*')
+EXP_GLOB = os.path.join(ROOT, 'derivatives/experiment_*')
+print(EXP_GLOB)
 output_path = os.path.join(ROOT, 'fig')
 
 n_sources = 2
@@ -16,7 +17,7 @@ psth_all = []
 exp_dirs = sorted(glob.glob(EXP_GLOB))
 n_exps = len(exp_dirs)
 for exp_id, exp_dir in enumerate(exp_dirs):
-    psth = np.load(f'{exp_dir}/derivatives/psth.npy')
+    psth = np.load(f'{exp_dir}/psth.npy')
     psth_all.append(psth)
 
 psth_all = np.array(psth_all)

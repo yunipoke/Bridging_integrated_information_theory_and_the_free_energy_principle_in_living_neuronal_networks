@@ -8,7 +8,7 @@ import scipy.stats as st
 from utils import formatted_ax, forest_plot, sig, logit, plot_session_transitions, iqr
 
 ROOT = os.getcwd()
-EXP_GLOB = os.path.join(ROOT, "experiment_*")
+EXP_GLOB = os.path.join(ROOT, 'derivatives/experiment_*')
 output_path = os.path.join(ROOT, 'fig')
 
 n_sources = 2
@@ -31,11 +31,11 @@ Accuracy_all = []
 states_Bayesian_surprise_all = []
 response_iqr_all = []
 for exp_id, exp_dir in enumerate(exp_dirs):
-    neuronal_responses = np.load(f'{exp_dir}/derivatives/neuronal_responses.npy')
-    s1_preferring_electrodes = np.load(f'{exp_dir}/derivatives/s1_preferring_electrodes.npy')
-    s2_preferring_electrodes = np.load(f'{exp_dir}/derivatives/s2_preferring_electrodes.npy')
-    source_states = np.load(f'{exp_dir}/derivatives/hidden_source_states.npy')
-    observations = np.load(f'{exp_dir}/derivatives/observations.npy')
+    neuronal_responses = np.load(f'{exp_dir}/neuronal_responses.npy')
+    s1_preferring_electrodes = np.load(f'{exp_dir}/s1_preferring_electrodes.npy')
+    s2_preferring_electrodes = np.load(f'{exp_dir}/s2_preferring_electrodes.npy')
+    source_states = np.load(f'{exp_dir}/hidden_source_states.npy')
+    observations = np.load(f'{exp_dir}/observations.npy')
     source_states = source_states[:, 0] * 1 + source_states[:, 1] * 2
     n_channels = neuronal_responses.shape[2]
 
@@ -96,9 +96,9 @@ for exp_id, exp_dir in enumerate(exp_dirs):
     VFE_all.append(VFE)
     Bayesian_surprise_all.append(Bayesian_surprise)
     Accuracy_all.append(Accuracy)
-    np.save(f'{exp_dir}/derivatives/variational_free_energy.npy', VFE)
-    np.save(f'{exp_dir}/derivatives/Bayesian_surprise.npy', Bayesian_surprise)
-    np.save(f'{exp_dir}/derivatives/accuracy.npy', Accuracy)
+    np.save(f'{exp_dir}/variational_free_energy.npy', VFE)
+    np.save(f'{exp_dir}/Bayesian_surprise.npy', Bayesian_surprise)
+    np.save(f'{exp_dir}/accuracy.npy', Accuracy)
 
     states_Bayesian_surprise = np.zeros((n_sessions, 1 << n_sources, n_sources))
     for i_state in range(1 << n_sources):

@@ -7,7 +7,7 @@ import scipy.stats as st
 from utils import pvalue_asterisk, data_to_axes, formatted_ax
 
 ROOT = os.getcwd()
-EXP_GLOB = os.path.join(ROOT, "experiment_*")
+EXP_GLOB = os.path.join(ROOT, 'derivatives/experiment_*')
 output_path = os.path.join(ROOT, 'fig')
 
 n_sources = 2
@@ -20,8 +20,8 @@ response_KLD_all = []
 s1mean_responses_on_all = []
 s1mean_responses_off_all = []
 for exp_id, exp_dir in enumerate(exp_dirs):
-    neuronal_responses = np.load(f'{exp_dir}/derivatives/neuronal_responses.npy')
-    source_states = np.load(f'{exp_dir}/derivatives/hidden_source_states.npy')
+    neuronal_responses = np.load(f'{exp_dir}/neuronal_responses.npy')
+    source_states = np.load(f'{exp_dir}/hidden_source_states.npy')
     source_states = source_states[:, 0] * 1 + source_states[:, 1] * 2
     n_channels = neuronal_responses.shape[2]
     
@@ -34,7 +34,7 @@ for exp_id, exp_dir in enumerate(exp_dirs):
     response_KLD[invalid_mask] = -1
     valid_channels = np.where(~(response_KLD == -1).any(axis = 0))[0]
     response_KLD = response_KLD[:, valid_channels]
-    np.save(f'{exp_dir}/derivatives/response_KLD.npy', response_KLD)
+    np.save(f'{exp_dir}/response_KLD.npy', response_KLD)
     response_KLD_all.append(response_KLD)
     
     
@@ -47,8 +47,8 @@ for exp_id, exp_dir in enumerate(exp_dirs):
     response_mean = np.mean(response_session_mean, axis = 0)
     s1_preferring_electrodes = np.arange(n_channels)[(preference_diff > 0) & (response_session_mean_min > 0) & (response_mean > 0)]
     s2_preferring_electrodes = np.arange(n_channels)[(preference_diff < 0) & (response_session_mean_min > 0) & (response_mean > 0)]
-    np.save(f'{exp_dir}/derivatives/s1_preferring_electrodes.npy', s1_preferring_electrodes)
-    np.save(f'{exp_dir}/derivatives/s2_preferring_electrodes.npy', s2_preferring_electrodes)
+    np.save(f'{exp_dir}/s1_preferring_electrodes.npy', s1_preferring_electrodes)
+    np.save(f'{exp_dir}/s2_preferring_electrodes.npy', s2_preferring_electrodes)
     s1on_mask = (source_states % 2 == 1)
     s1on_responses = neuronal_responses[:, s1on_mask, :]
     s1off_responses = neuronal_responses[:, ~s1on_mask, :]
