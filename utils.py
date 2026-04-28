@@ -37,9 +37,9 @@ def pvalue_asterisk(pvalue):
 
 def data_to_axes(x, y, ax):
     return ax.transAxes.inverted().transform(ax.transData.transform((x, y)))
-def formatted_ax(n_palette=27):
+def formatted_ax(cmap = 'husl', n_palette=27):
     sns.set()
-    sns.set_palette('husl', n_palette)
+    sns.set_palette(cmap, n_palette)
     fig = plt.figure( dpi=fig_dpi, figsize=(fig_w_inch, fig_h_inch))
     divider = Divider(fig, (0.0, 0.0, 1.0, 1.0), ax_p_w, ax_p_h, aspect=False)
     ax = Axes(fig, divider.get_position())
@@ -64,7 +64,9 @@ def forest_plot(rho, save_name, n=100, labels=None, show_summary=True, excel_sav
     ci_r = np.tanh(ci_z)
 
     var_i = se**2
-    Q   = np.sum((1/var_i) * (z - z.mean())**2)
+    w_fe = 1/var_i
+    z_fe  = np.sum(w_fe * z) / np.sum(w_fe)
+    Q   = np.sum(w_fe * (z - z_fe)**2)
     dfQ = K - 1
     I2  = max(0.0, (Q - dfQ) / Q) * 100.0
     tau2 = max(0., (Q - (K-1)) /
@@ -80,11 +82,6 @@ def forest_plot(rho, save_name, n=100, labels=None, show_summary=True, excel_sav
     p_two  = st.norm.sf(abs(zval)) * 2
     p_label = pvalue_asterisk(p_two)
     print(p_two, Q, tau2, I2)
-
-    sigma_bar2 = var_i.mean()
-    se_pred    = np.sqrt(tau2 + sigma_bar2)
-    pi_z       = z_re + np.array([-1.96, 1.96]) * se_pred
-    pi_r       = np.tanh(pi_z)
 
     df = pd.DataFrame({
         "rho": rho,
@@ -109,17 +106,11 @@ def forest_plot(rho, save_name, n=100, labels=None, show_summary=True, excel_sav
                     fmt="D", markersize=15, mfc="blue", mec="blue",
                     capsize=7, lw=4, color = 'blue', zorder = 3)
 
-        ax.errorbar(rho_re, y0,
-            xerr=[[rho_re-pi_r[0]], [pi_r[1]-rho_re]],
-            fmt="none", color="skyblue",
-            capsize=8, alpha=0.5, lw = 7, zorder = 2)
-
         ax.text(-1.1-0.05, y0, "Overall",
                 va="center", ha="right", size=18)
 
         x_min, x_max = ax.get_xlim()
         ax.set_xlim(x_min, x_max * 1.15)  
-        ax.text(1.1+0.05, y0, '****', c='white', va="center", ha="left", size=24)
         ax.text(1.1+0.05, y0-0.3, p_label, va="center", ha="left", size=24)
 
     ax.set_xlim(-1.1, 1.1)
@@ -127,7 +118,7 @@ def forest_plot(rho, save_name, n=100, labels=None, show_summary=True, excel_sav
     ax.set_yticklabels(df["label"], size=16)
     ax.set_xlabel(r"Spearman $\rho$", size=24)
     ax.set_xticks(np.linspace(-1, 1, 5))
-    ax.set_xticklabels(ax.get_xticklabels(), fontsize=16)
+    # ax.set_xticklabels(ax.get_xticklabels(), fontsize=16)
     ax.tick_params(axis='both', which='major', labelsize = 16)
     plt.tight_layout()
 
@@ -146,13 +137,94 @@ def forest_plot(rho, save_name, n=100, labels=None, show_summary=True, excel_sav
         df.loc[0, 'overall_ci_low'] = ci_re_r[0]
         df['overall_ci_high'] = np.full(K, np.nan)
         df.loc[0, 'overall_ci_high'] = ci_re_r[1]
-        df['overall_pi_low'] = np.full(K, np.nan)
-        df.loc[0, 'overall_pi_low'] = pi_r[0]
-        df['overall_pi_high'] = np.full(K, np.nan)
-        df.loc[0, 'overall_pi_high'] = pi_r[1]
         with pd.ExcelWriter(excel_name, mode = 'a', if_sheet_exists = 'replace') as writer:
             df.to_excel(writer, sheet_name = sheet_name, index = False)
     
+def forest_plot_beta(beta, se, xlabel, save_name, n=100, labels=None, show_summary=True, excel_save = True, excel_name = 'SourceData.xlsx', sheet_name = ''):
+
+    beta = np.asarray(beta, dtype=float)
+    K = len(beta)
+
+    if np.isscalar(n):
+        n = np.full(K, n, dtype=int)
+    n = np.asarray(n)
+
+    ci = np.vstack([beta - 1.96*se, beta + 1.96*se]).T
+
+    var_i = se**2
+    w_fe = 1/var_i
+    beta_fe = np.sum(w_fe * beta) / np.sum(w_fe)
+
+    Q   = np.sum(w_fe * (beta - beta_fe)**2)
+    dfQ = K - 1
+    I2  = max(0.0, (Q - dfQ) / Q) * 100.0
+    tau2 = max(0., (Q - (K-1)) /
+                    (np.sum(1/var_i) - np.sum((1/var_i)**2)/np.sum(1/var_i)))
+    w_re  = 1 / (var_i + tau2)
+    beta_re  = np.sum(w_re * beta) / np.sum(w_re)
+    se_re = np.sqrt(1 / np.sum(w_re))
+    ci_re = beta_re + np.array([-1.96, 1.96]) * se_re
+
+    zval   = beta_re / se_re
+    p_two  = st.norm.sf(abs(zval)) * 2
+    p_label = pvalue_asterisk(p_two)
+    print(p_two, Q, tau2, I2)
+
+    df = pd.DataFrame({
+        "beta": beta,
+        "ci_low": ci[:, 0],
+        "ci_high": ci[:, 1],
+        "label": labels if labels is not None else [f"Exp {i+1}" for i in range(K)]
+    }).iloc[::-1]
+
+    fig, ax = plt.subplots(figsize=(8, 0.3*K + (1 if show_summary else 0.5)))
+
+    ax.axvline(0, linestyle="--", lw=3, color="red")
+
+    ax.errorbar(df["beta"], df.index,
+                xerr=[df["beta"]-df["ci_low"], df["ci_high"]-df["beta"]],
+                fmt="o", capsize=6, color="black", lw=4, markersize=10)
+    
+
+    if show_summary:
+        y0 = -1
+        ax.errorbar(beta_re, y0,
+                    xerr=[[beta_re - ci_re[0]], [ci_re[1] - beta_re]],
+                    fmt="D", markersize=15, mfc="blue", mec="blue",
+                    capsize=7, lw=4, color = 'blue', zorder = 3)
+
+        x_min, x_max = ax.get_xlim()
+
+        ax.text(min(-1, x_min)-0.05, y0, "Overall",
+                va="center", ha="right", size=18)
+
+        ax.set_xlim(min(-1, x_min), max(1, x_max * 1.15))  
+        ax.text(max(1, x_max*1.15)+0.05, y0-0.3, p_label, va="center", ha="left", size=24)
+
+    ax.set_yticks(df.index)
+    ax.set_yticklabels(df["label"], size=16)
+    ax.set_xlabel(xlabel, size=24)
+    # ax.set_xticklabels(ax.get_xticklabels(), fontsize=16)
+    ax.tick_params(axis='both', which='major', labelsize = 16)
+    plt.tight_layout()
+
+    plt.savefig(f'{save_name}.pdf', dpi=1200)
+    plt.close()
+    
+    if excel_save:
+        df = pd.DataFrame()
+        df['experiment #'] = np.arange(1, K + 1)
+        df['beta'] = beta
+        df['ci_low'] = ci[:, 0]
+        df['ci_high'] = ci[:, 1]
+        df['overall_beta'] = np.full(K, np.nan)
+        df.loc[0, 'overall_beta'] = beta_re
+        df['overall_ci_low'] = np.full(K, np.nan)
+        df.loc[0, 'overall_ci_low'] = ci_re[0]
+        df['overall_ci_high'] = np.full(K, np.nan)
+        df.loc[0, 'overall_ci_high'] = ci_re[1]
+        with pd.ExcelWriter(excel_name, mode = 'a', if_sheet_exists = 'replace') as writer:
+            df.to_excel(writer, sheet_name = sheet_name, index = False)
 
 
 def logit(x):
@@ -171,7 +243,7 @@ def plot_session_transitions(X, value_name, save_name, color, plot_change = True
     Y = X.copy()
     
     if plot_change:
-        Y -= np.outer(Y[:, 0], np.ones(100))
+        Y -= np.outer(Y[:, 0], np.ones(n_obs))
 
     mean = np.mean(Y, axis = 0)
     se = np.std(Y, axis = 0, ddof = 1) / np.sqrt(n_exps)
@@ -195,7 +267,7 @@ def plot_session_transitions(X, value_name, save_name, color, plot_change = True
         
         y_text = mean[-1] / 2
         x_text = 5 + n_obs
-        ax.text(x_text, y_text, pvalue_label, ha='left', va='bottom', fontsize = 18)
+        ax.text(x_text, y_text, pvalue_label, ha='left', va='center', fontsize = 18)
         
     ax.set_xlim(0, n_obs + 1)
     plt.savefig(f'{save_name}.pdf', dpi = 1200)
@@ -213,6 +285,12 @@ def iqr(X, axis = 0):
     q1 = np.percentile(X, 25, axis = axis)
     q3 = np.percentile(X, 75, axis = axis)
     return q3 - q1
+
+def med_quan(X):
+    median = np.median(X)
+    q1 = np.percentile(X, 25)
+    q3 = np.percentile(X, 75)
+    return median, [q1, q3]
 
 def mutual_information(p_xy):
     with np.errstate(divide = 'ignore', invalid = 'ignore'):
@@ -240,3 +318,19 @@ def corr_color(rho):
         return 'blue'
     else:
         return 'black'
+
+def _finite(x):
+    x = np.asarray(x, float)
+    return x[np.isfinite(x)]
+
+def _count_pos(x):
+    x = np.asarray(x, float)
+    return int(np.sum(np.isfinite(x) & (x > 0))), int(np.sum(np.isfinite(x)))
+
+def _count_sig(p, alpha = 0.05):
+    p = np.asarray(p, float)
+    return int(np.sum(np.isfinite(p) & (p < alpha))), int(np.sum(np.isfinite(p)))
+
+def _jitter(n, scale = 0.06, seed = 0):
+    rng = np.random.default_rng(seed)
+    return rng.normal(0, scale, size=n)
