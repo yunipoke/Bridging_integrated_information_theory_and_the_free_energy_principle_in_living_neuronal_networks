@@ -5,8 +5,9 @@ import glob
 import matplotlib.pyplot as plt
 import seaborn as sns
 import scipy.stats as st
-from utils import formatted_ax, forest_plot, Z_score_2d, corr_color
+from utils import formatted_ax, forest_plot, forest_plot_beta, Z_score_2d, corr_color, med_quan, _jitter, _count_pos, _count_sig, _finite
 from multiprocessing import Pool
+import statsmodels.api as sm
 
 ROOT = os.getcwd()
 EXP_GLOB = os.path.join(ROOT, 'derivatives/experiment_*')
@@ -42,8 +43,7 @@ for exp_id, exp_dir in enumerate(exp_dirs):
     Accuracy = np.load(f'{exp_dir}/accuracy.npy')
     Accuracy = np.sum(Accuracy, axis = (1, 2))
     Accuracy_all.append(Accuracy)
-    Phi_R_mc = np.load(f'{exp_dir}/Phi_R_mc.npy')
-    Phi_R_mc /= n_prefs * (n_prefs - 1) / 2
+    Phi_R_mc = np.load(f'{exp_dir}/maximal_Phi_R_mc.npy')
     Phi_R_mc_all.append(Phi_R_mc)
     coreness = np.load(f'{exp_dir}/coreness.npy')
     coreness /= n_prefs * (n_prefs - 1) / 2
@@ -61,6 +61,7 @@ VFE_Z = Z_score_2d(VFE_all)
 Bayesian_surprise_Z = Z_score_2d(Bayesian_surprise_all)
 Accuracy_Z = Z_score_2d(Accuracy_all)
 Phi_R_mc_Z = Z_score_2d(Phi_R_mc_all)
+
 
 ax = formatted_ax()
 rhos_VFE_Phi = []
@@ -214,3 +215,165 @@ fig5g_df['coreness_contrast'] = coreness_contrast_all.ravel()
 with pd.ExcelWriter("SourceData.xlsx", mode = 'a', if_sheet_exists = 'replace') as writer:
     fig5g_df.to_excel(writer, sheet_name = 'Fig5g', index = False)
 forest_plot(rhos_bs_coreness, f'{output_path}/Fig5h', sheet_name = 'Fig5h')
+
+exit()
+
+t = np.arange(n_sessions) + 1
+n_models = 6
+beta_bs = np.zeros((n_models, n_exps))
+beta_se_bs = np.zeros((n_models, n_exps))
+p_bs = np.zeros((n_models, n_exps))
+beta_acc = np.zeros((n_models, n_exps))
+beta_se_acc = np.zeros((n_models, n_exps))
+p_acc = np.zeros((n_models, n_exps))
+R2 = np.zeros((n_models, n_exps))
+for i_exp in range(n_exps):
+    mod_bs = sm.OLS(Phi_R_mc_Z[i_exp], sm.add_constant(np.c_[Bayesian_surprise_Z[i_exp]]))
+    mod_acc = sm.OLS(Phi_R_mc_Z[i_exp], sm.add_constant(np.c_[Accuracy_Z[i_exp]]))
+    mod_bs_acc = sm.OLS(Phi_R_mc_Z[i_exp], sm.add_constant(np.c_[Bayesian_surprise_Z[i_exp], Accuracy_Z[i_exp]]))
+    mod_bs_t = sm.OLS(Phi_R_mc_Z[i_exp], sm.add_constant(np.c_[Bayesian_surprise_Z[i_exp], t]))
+    mod_acc_t = sm.OLS(Phi_R_mc_Z[i_exp], sm.add_constant(np.c_[Accuracy_Z[i_exp], t]))
+    mod_bs_acc_t = sm.OLS(Phi_R_mc_Z[i_exp], sm.add_constant(np.c_[Bayesian_surprise_Z[i_exp], Accuracy_Z[i_exp], t]))
+
+    fit_bs = mod_bs.fit()
+    fit_acc = mod_acc.fit()
+    fit_bs_acc = mod_bs_acc.fit()
+    fit_bs_t = mod_bs_t.fit()
+    fit_acc_t = mod_acc_t.fit()
+    fit_bs_acc_t = mod_bs_acc_t.fit()
+    
+    beta_bs[0, i_exp] = fit_bs.params[1]
+    beta_bs[1, i_exp] = None
+    beta_bs[2, i_exp] = fit_bs_acc.params[1]
+    beta_bs[3, i_exp] = fit_bs_t.params[1]
+    beta_bs[4, i_exp] = None
+    beta_bs[5, i_exp] = fit_bs_acc_t.params[1]
+
+    beta_se_bs[0, i_exp] = fit_bs.bse[1]
+    beta_se_bs[1, i_exp] = None
+    beta_se_bs[2, i_exp] = fit_bs_acc.bse[1]
+    beta_se_bs[3, i_exp] = fit_bs_t.bse[1]
+    beta_se_bs[4, i_exp] = None
+    beta_se_bs[5, i_exp] = fit_bs_acc_t.bse[1]
+
+    beta_acc[0, i_exp] = None
+    beta_acc[1, i_exp] = fit_acc.params[1]
+    beta_acc[2, i_exp] = fit_bs_acc.params[2]
+    beta_acc[3, i_exp] = None
+    beta_acc[4, i_exp] = fit_acc_t.params[1]
+    beta_acc[5, i_exp] = fit_bs_acc_t.params[2]
+
+    beta_se_acc[0, i_exp] = None
+    beta_se_acc[1, i_exp] = fit_acc.bse[1]
+    beta_se_acc[2, i_exp] = fit_bs_acc.bse[2]
+    beta_se_acc[3, i_exp] = None
+    beta_se_acc[4, i_exp] = fit_acc_t.bse[1]
+    beta_se_acc[5, i_exp] = fit_bs_acc_t.bse[2]
+
+    p_bs[0, i_exp] = fit_bs.pvalues[1]
+    p_bs[1, i_exp] = None
+    p_bs[2, i_exp] = fit_bs_acc.pvalues[1]
+    p_bs[3, i_exp] = fit_bs_t.pvalues[1]
+    p_bs[4, i_exp] = None
+    p_bs[5, i_exp] = fit_bs_acc_t.pvalues[1]
+
+    p_acc[0, i_exp] = None
+    p_acc[1, i_exp] = fit_acc.pvalues[1]
+    p_acc[2, i_exp] = fit_bs_acc.pvalues[2]
+    p_acc[3, i_exp] = None
+    p_acc[4, i_exp] = fit_acc_t.pvalues[1]
+    p_acc[5, i_exp] = fit_bs_acc_t.pvalues[2]
+    
+    R2[0, i_exp] = fit_bs.rsquared
+    R2[1, i_exp] = fit_acc.rsquared
+    R2[2, i_exp] = fit_bs_acc.rsquared
+    R2[3, i_exp] = fit_bs_t.rsquared
+    R2[4, i_exp] = fit_acc_t.rsquared
+    R2[5, i_exp] = fit_bs_acc_t.rsquared
+
+for i_model in range(n_models):
+    print(med_quan(R2[i_model]), med_quan(beta_bs[i_model]), (beta_bs[i_model] > 0).sum(), (p_bs[i_model] < 0.05).sum(), med_quan(beta_acc[i_model]), (beta_acc[i_model] > 0).sum(), (p_acc[i_model] < 0.05).sum())
+
+dR2_no_t = R2[0, :] - R2[1, :]
+dR2_t    = R2[3, :] - R2[4, :]
+
+b_bs_no_t = beta_bs[2, :]    
+b_acc_no_t = beta_acc[2, :]  
+b_bs_t = beta_bs[5, :]       
+b_acc_t = beta_acc[5, :]     
+
+ax = formatted_ax()
+ax.axhline(0, linewidth = 1)
+
+x0, x1 = 0.0, 1.0
+j0 = _jitter(n_exps, seed = 1)
+j1 = _jitter(n_exps, seed = 2)
+
+ax.scatter(np.full(n_exps, x0) + j0, dR2_no_t, s = 14, color = 'black')
+ax.scatter(np.full(n_exps, x1) + j1, dR2_t, s = 14, color = 'black')
+
+for i in range(n_exps):
+    if np.isfinite(dR2_no_t[i]) and np.isfinite(dR2_t[i]):
+        ax.plot([x0 + j0[i], x1 + j1[i]], [dR2_no_t[i], dR2_t[i]], linewidth = 0.4, color = 'black')
+
+n_pos0, n0 = _count_pos(dR2_no_t)
+n_pos1, n1 = _count_pos(dR2_t)
+med0 = np.nanmedian(dR2_no_t)
+med1 = np.nanmedian(dR2_t)
+
+ax.text(0.00, -0.20,
+        f"no t:  ΔR²>0 = {n_pos0}/{n0},  median={med0:.3f}\n"
+        f"+t  :  ΔR²>0 = {n_pos1}/{n1},  median={med1:.3f}",
+        transform=ax.transAxes, va="top")
+
+ax.set_xlim(-0.5, 1.5)
+ax.set_xticks([0, 1])
+ax.set_xticklabels([r"no $t$", r"+ $t$"])
+ax.set_ylabel(r"$\Delta R^2 = R^2(\Phi_R^{mc}\sim BS) - R^2(\Phi_R^{mc}\sim Acc)$")
+plt.savefig(f'{output_path}/FigS1a.pdf', dpi = 1200)
+plt.close()
+figS1a_df = pd.DataFrame()
+figS1a_df['experiment #'] = np.arange(n_exps)
+figS1a_df['dR2_no_t'] = dR2_no_t
+figS1a_df['dR2_t'] = dR2_t
+with pd.ExcelWriter("SourceData.xlsx", mode = 'a', if_sheet_exists = 'replace') as writer:
+    figS1a_df.to_excel(writer, sheet_name = 'FigS1a', index = False)
+
+ax = formatted_ax('husl', 4)
+ax.axhline(0, linewidth = 1)
+
+groups = [
+    (r"$\beta_{BS}$ in $\Phi_R^{mc}\sim BS+Acc$", b_bs_no_t, p_bs[2, :]),
+    (r"$\beta_{Acc}$ in $\Phi_R^{mc}\sim BS+Acc$", b_acc_no_t, p_acc[2, :]),
+    (r"$\beta_{BS}$ in $\Phi_R^{mc}\sim BS+Acc+t$", b_bs_t, p_bs[5, :]),
+    (r"$\beta_{Acc}$ in $\Phi_R^{mc}\sim BS+Acc+t$", b_acc_t, p_acc[5, :]),
+]
+
+for gi, (label, vals, pvals) in enumerate(groups):
+    x = np.full(n_exps, gi, dtype = float) + _jitter(n_exps, seed = 10 + gi)
+    ax.scatter(x, vals, s = 14)
+
+ax.set_xlim(-0.6, len(groups)-0.4)
+ax.set_xticks(range(len(groups)))
+ax.set_xticklabels([g[0] for g in groups], rotation = 25, ha="right")
+ax.set_ylabel("Standardized coefficient")
+plt.savefig(f'{output_path}/FigS1b.pdf', dpi = 1200)
+plt.close()
+figS1b_df = pd.DataFrame()
+figS1b_df['experiment #'] = np.arange(n_exps)
+figS1b_df['beta_bs_no_t'] = b_bs_no_t
+figS1b_df['beta_acc_no_t'] = b_acc_no_t
+figS1b_df['beta_bs_t'] = b_bs_t
+figS1b_df['beta_acc_t'] = b_acc_t
+with pd.ExcelWriter("SourceData.xlsx", mode = 'a', if_sheet_exists = 'replace') as writer:
+    figS1b_df.to_excel(writer, sheet_name = 'FigS1b', index = False)
+
+forest_plot_beta(beta_bs[0], beta_se_bs[0], r"$\beta_{BS}$ in $\Phi_R^{mc}\sim BS$", f'{output_path}/FigS2a', sheet_name = 'FigS2a')
+forest_plot_beta(beta_bs[2], beta_se_bs[2], r"$\beta_{BS}$ in $\Phi_R^{mc}\sim BS+Acc$", f'{output_path}/FigS2b', sheet_name = 'FigS2b')
+forest_plot_beta(beta_bs[3], beta_se_bs[3], r"$\beta_{BS}$ in $\Phi_R^{mc}\sim BS+t$", f'{output_path}/FigS2c', sheet_name = 'FigS2c')
+forest_plot_beta(beta_bs[5], beta_se_bs[5], r"$\beta_{BS}$ in $\Phi_R^{mc}\sim BS+Acc+t$", f'{output_path}/FigS2d', sheet_name = 'FigS2d')
+
+forest_plot_beta(beta_acc[1], beta_se_acc[1], r"$\beta_{Acc}$ in $\Phi_R^{mc}\sim Acc$", f'{output_path}/FigS3a', sheet_name = 'FigS3a')
+forest_plot_beta(beta_acc[2], beta_se_acc[2], r"$\beta_{Acc}$ in $\Phi_R^{mc}\sim BS+Acc$", f'{output_path}/FigS3b', sheet_name = 'FigS3b')
+forest_plot_beta(beta_acc[4], beta_se_acc[4], r"$\beta_{Acc}$ in $\Phi_R^{mc}\sim Acc+t$", f'{output_path}/FigS3c', sheet_name = 'FigS3c')
+forest_plot_beta(beta_acc[5], beta_se_acc[5], r"$\beta_{Acc}$ in $\Phi_R^{mc}\sim BS+Acc+t$", f'{output_path}/FigS3d', sheet_name = 'FigS3d')
