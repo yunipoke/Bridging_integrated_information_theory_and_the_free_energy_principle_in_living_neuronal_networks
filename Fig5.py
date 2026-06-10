@@ -216,9 +216,11 @@ with pd.ExcelWriter("SourceData.xlsx", mode = 'a', if_sheet_exists = 'replace') 
     fig5g_df.to_excel(writer, sheet_name = 'Fig5g', index = False)
 forest_plot(rhos_bs_coreness, f'{output_path}/Fig5h', sheet_name = 'Fig5h')
 
-exit()
 
 t = np.arange(n_sessions) + 1
+mu_t = t.mean()
+sigma_t = t.std()
+t = (t - mu_t) / sigma_t
 n_models = 6
 beta_bs = np.zeros((n_models, n_exps))
 beta_se_bs = np.zeros((n_models, n_exps))
@@ -377,3 +379,31 @@ forest_plot_beta(beta_acc[1], beta_se_acc[1], r"$\beta_{Acc}$ in $\Phi_R^{mc}\si
 forest_plot_beta(beta_acc[2], beta_se_acc[2], r"$\beta_{Acc}$ in $\Phi_R^{mc}\sim BS+Acc$", f'{output_path}/FigS3b', sheet_name = 'FigS3b')
 forest_plot_beta(beta_acc[4], beta_se_acc[4], r"$\beta_{Acc}$ in $\Phi_R^{mc}\sim Acc+t$", f'{output_path}/FigS3c', sheet_name = 'FigS3c')
 forest_plot_beta(beta_acc[5], beta_se_acc[5], r"$\beta_{Acc}$ in $\Phi_R^{mc}\sim BS+Acc+t$", f'{output_path}/FigS3d', sheet_name = 'FigS3d')
+
+beta_t2 = []
+beta_se_t2 = []
+pvalues_t2 = []
+peaks = []
+for i_exp in range(n_exps):
+    mod_t_t2 = sm.OLS(Phi_R_mc_Z[i_exp], sm.add_constant(np.c_[t,t**2]))
+
+    fit_t_t2 = mod_t_t2.fit()
+    
+    b1 = fit_t_t2.params[1]
+    b2 = fit_t_t2.params[2]
+    
+    beta_t2.append(b2)
+    beta_se_t2.append(fit_t_t2.bse[2])
+    pvalues_t2.append(fit_t_t2.pvalues[2])
+
+    peak = -b1/2/b2
+    peaks.append(peak)
+
+beta_t2 = np.array(beta_t2)
+beta_se_t2 = np.array(beta_se_t2)
+pvalues_t2 = np.array(pvalues_t2)
+peaks = np.array(peaks)
+peaks = mu_t + sigma_t * peaks
+print(((1 <= peaks) & (peaks <= 100)).sum())
+
+forest_plot_beta(beta_t2, beta_se_t2, r"$\beta_{t^2}}$ in $\Phi_R^{mc}\sim t+t^2$", f'{output_path}/FigS4', sheet_name = 'FigS4')
